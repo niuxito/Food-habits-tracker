@@ -57,11 +57,6 @@ summary{ cursor:pointer; color:var(--text); font-weight:650; }
 
   </style>
 </head>
-  <script>
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js");
-}
-  </script>
 <body>
 <header>
   <div class="wrap">
@@ -912,5 +907,10 @@ if ("serviceWorker" in navigator) {
     alert('Error inicializando la app: ' + (err?.message || String(err)));
   });
 })();
-</script></body>
+</script>
+  <script>
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("./service-worker.js");
+}
+  </script></body>
 </html>
