@@ -1,0 +1,909 @@
+<!doctype html>
+
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Food Habits Tracker v2</title>
+  <style>
+    :root { --bg:#0b0c10; --card:#14161d; --text:#e9eef7; --muted:#aab4c3; --line:#2a2f3a; --accent:#7aa2ff; --danger:#ff6b6b; }
+    *{ box-sizing:border-box; }
+    body{ margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:var(--bg); color:var(--text); }
+    header{ position:sticky; top:0; background:rgba(11,12,16,0.92); backdrop-filter: blur(10px); border-bottom:1px solid var(--line); z-index:10; }
+    .wrap{ max-width:980px; margin:0 auto; padding:16px; }
+    h1{ font-size:18px; margin:0 0 10px; }
+    .row{ display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+    .row > *{ flex: 1; }
+    .btn{ background:var(--accent); color:#091022; border:0; padding:10px 12px; border-radius:10px; font-weight:650; cursor:pointer; }
+    .btn.secondary{ background:transparent; color:var(--text); border:1px solid var(--line); }
+    .btn.danger{ background:transparent; color:var(--danger); border:1px solid rgba(255,107,107,0.5); }
+    .btn:disabled{ opacity:.55; cursor:not-allowed; }
+    .card{ background:var(--card); border:1px solid var(--line); border-radius:16px; padding:14px; margin:14px 0; }
+    .card h2{ font-size:15px; margin:0 0 10px; }
+    label{ display:block; font-size:12px; color:var(--muted); margin:8px 0 6px; }
+    input, select, textarea{ width:100%; background:#0f1118; border:1px solid var(--line); color:var(--text); padding:10px; border-radius:10px; outline:none; }
+    textarea{ min-height:72px; resize:vertical; }
+    .grid2{ display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+    @media (max-width: 760px){ .grid2{ grid-template-columns: 1fr; } }.chips{ display:flex; gap:8px; flex-wrap:wrap; }
+.chip{ border:1px solid var(--line); background:transparent; color:var(--text); padding:6px 10px; border-radius:999px; cursor:pointer; }
+.chip:hover{ border-color: rgba(122,162,255,0.6); }
+
+.list{ display:flex; flex-direction:column; gap:10px; }
+.item{ border:1px solid var(--line); border-radius:14px; padding:10px; background:#10131b; }
+.item .top{ display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
+.item .meta{ color:var(--muted); font-size:12px; margin-top:6px; }
+.item .actions{ display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; align-items:flex-start; }
+.pill{ display:inline-block; padding:2px 8px; border:1px solid var(--line); border-radius:999px; font-size:12px; color:var(--muted); }
+.sep{ height:1px; background:var(--line); margin:10px 0; }
+.small{ font-size:12px; color:var(--muted); }
+.toast{ position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:#0f1118; border:1px solid var(--line); padding:10px 12px; border-radius:12px; color:var(--text); display:none; max-width: min(92vw, 720px); z-index:999; }
+.toast.show{ display:block; }
+.mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+
+.editBox{ display:none; margin-top:10px; padding-top:10px; border-top:1px solid var(--line); }
+
+@media (max-width: 520px){
+  .item .top{ flex-direction:column; align-items:stretch; }
+  .item .actions{ width:100%; }
+  .item .actions .btn{ width:100%; }
+}
+
+details{ border:1px solid var(--line); border-radius:12px; padding:10px; background:#10131b; }
+summary{ cursor:pointer; color:var(--text); font-weight:650; }
+.legend{ margin-top:10px; color:var(--muted); font-size:12px; line-height:1.45; }
+.legend b{ color:var(--text); }
+
+  </style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="row" style="align-items:flex-end;">
+      <div style="flex:2;">
+        <h1>Food Habits Tracker v2</h1>
+        <div class="small">Offline-first. Datos guardados localmente en tu navegador (IndexedDB). Sin backend.</div>
+      </div>
+      <div style="flex:1;">
+        <label for="datePicker">Fecha</label>
+        <input id="datePicker" type="date" />
+      </div>
+      <div style="display:flex; gap:10px; justify-content:flex-end; align-items:flex-end;">
+        <button id="btnExport" class="btn secondary" title="Descarga 3 CSV (comidas, heces, estado)">Exportar CSV</button>
+        <button id="btnClear" class="btn danger" title="Borra todo (irreversible)">Borrar todo</button>
+      </div>
+    </div>
+  </div>
+</header><main class="wrap">  <div class="card" id="cardMeals">
+    <h2>Comidas</h2><div class="grid2">
+  <div>
+    <label for="mealSearch">Buscar / escribir comida</label>
+    <input id="mealSearch" list="mealCatalogList" placeholder="Ej: Yogur + avena + plátano" />
+    <datalist id="mealCatalogList"></datalist>
+    <div class="small" style="margin-top:6px;">Si escribes una nueva comida, se puede guardar como plantilla.</div>
+  </div>
+  <div>
+    <label for="mealSatiety">¿Cómo me he sentido de lleno?</label>
+    <select id="mealSatiety">
+      <option value="">(sin indicar)</option>
+      <option value="1">1 - Nada lleno</option>
+      <option value="2">2 - Poco lleno</option>
+      <option value="3">3 - Bien / neutral</option>
+      <option value="4">4 - Bastante lleno</option>
+      <option value="5">5 - Demasiado lleno</option>
+    </select>
+  </div>
+</div>
+
+<div class="grid2">
+  <div>
+    <label for="mealNotes">Notas (opcional)</label>
+    <input id="mealNotes" placeholder="Ej: con fresas, comí rápido, etc." />
+  </div>
+  <div style="display:flex; align-items:flex-end; gap:10px;">
+    <button id="btnAddMeal" class="btn" style="width:100%;">Añadir comida</button>
+    <button id="btnPinMeal" class="btn secondary" style="width:100%;" title="Guardar la comida actual como plantilla/favorita">Guardar como plantilla</button>
+  </div>
+</div>
+
+<div class="sep"></div>
+
+<div>
+  <label>Recientes / Favoritas</label>
+  <div id="mealChips" class="chips"></div>
+</div>
+
+<div class="sep"></div>
+
+<div>
+  <label>Listado del día</label>
+  <div id="mealList" class="list"></div>
+  <div id="mealEmpty" class="small">No hay comidas registradas para este día.</div>
+</div>
+
+  </div>  <div class="card" id="cardStatus">
+    <h2>Estado general (5 métricas)</h2><div class="grid2">
+  <div>
+    <label for="stEnergy">Energía (1–5)</label>
+    <input id="stEnergy" type="number" min="1" max="5" step="1" placeholder="1..5" />
+  </div>
+  <div>
+    <label for="stMood">Ánimo (1–5)</label>
+    <input id="stMood" type="number" min="1" max="5" step="1" placeholder="1..5" />
+  </div>
+  <div>
+    <label for="stStress">Estrés (1–5)</label>
+    <input id="stStress" type="number" min="1" max="5" step="1" placeholder="1..5" />
+  </div>
+  <div>
+    <label for="stDiscomfort">Dolor/molestias (0–5)</label>
+    <input id="stDiscomfort" type="number" min="0" max="5" step="1" placeholder="0..5" />
+  </div>
+  <div>
+    <label for="stCravings">Hambre/antojos (1–5)</label>
+    <input id="stCravings" type="number" min="1" max="5" step="1" placeholder="1..5" />
+  </div>
+  <div>
+    <label for="stNotes">Notas del día (opcional)</label>
+    <textarea id="stNotes" placeholder="Ej: dormí mal, ansiedad, viaje, etc."></textarea>
+  </div>
+</div>
+
+<div class="small">Se guarda automáticamente al cambiar un valor.</div>
+
+  </div>  <div class="card" id="cardStools">
+    <h2>Heces</h2><div class="grid2">
+  <div>
+    <label for="stoolBristol">Escala de Bristol (1–7)</label>
+    <select id="stoolBristol">
+      <option value="">Selecciona…</option>
+      <option value="1">1</option>
+      <option value="2">2</option>
+      <option value="3">3</option>
+      <option value="4">4</option>
+      <option value="5">5</option>
+      <option value="6">6</option>
+      <option value="7">7</option>
+    </select>
+  </div>
+  <div>
+    <label for="stoolDesc">Descripción (obligatorio)</label>
+    <input id="stoolDesc" placeholder="Ej: blandas, líquidas, con urgencia, etc." />
+  </div>
+</div>
+
+<div class="grid2">
+  <div>
+    <label for="stoolNotes">Notas (opcional)</label>
+    <input id="stoolNotes" placeholder="Ej: dolor, cambios, color, etc." />
+  </div>
+  <div style="display:flex; align-items:flex-end;">
+    <button id="btnAddStool" class="btn" style="width:100%;">Añadir heces</button>
+  </div>
+</div>
+
+<div class="sep"></div>
+
+<details>
+  <summary>Ayuda: ¿Qué significa cada número de Bristol?</summary>
+  <div class="legend">
+    <div><b>1</b>: bolitas duras separadas, como nueces (estreñimiento).</div>
+    <div><b>2</b>: forma de salchicha pero grumosa.</div>
+    <div><b>3</b>: salchicha con grietas en la superficie.</div>
+    <div><b>4</b>: salchicha o serpiente, suave y blanda (ideal).</div>
+    <div><b>5</b>: trozos blandos con bordes definidos (poca fibra).</div>
+    <div><b>6</b>: trozos esponjosos con bordes irregulares, pastosa.</div>
+    <div><b>7</b>: líquida, sin trozos sólidos (diarrea).</div>
+  </div>
+</details>
+
+<div class="sep"></div>
+
+<div>
+  <label>Listado del día</label>
+  <div id="stoolList" class="list"></div>
+  <div id="stoolEmpty" class="small">No hay registros de heces para este día.</div>
+</div>
+
+  </div>  <div class="card">
+    <h2>Historial rápido</h2>
+    <div class="small">Selecciona una fecha arriba para ver/editar ese día.</div>
+  </div></main><div id="toast" class="toast"></div><script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const nowISO = () => new Date().toISOString();
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const toDateStr = (d) => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+  const toTimeStr = (d) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : `id_${Math.random().toString(16).slice(2)}_${Date.now()}`);
+
+  const toastEl = $("toast");
+  let toastTimer = null;
+  function toast(msg){
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2200);
+  }
+
+  function csvEscape(value){
+    if (value === null || value === undefined) return '';
+    const s = String(value);
+    if (/[\n\r,\"]/g.test(s)) return `"${s.replace(/\"/g,'""')}"`;
+    return s;
+  }
+
+  function htmlEscape(value){
+    if (value === null || value === undefined) return '';
+    return String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function downloadText(filename, content, mime='text/plain'){
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function isValidDateStr(s){
+    return /^\d{4}-\d{2}-\d{2}$/.test(s);
+  }
+  function isValidTimeStr(s){
+    return /^\d{2}:\d{2}$/.test(s);
+  }
+
+  const DB_NAME = 'food_tracker';
+  const DB_VER = 1;
+  let db = null;
+
+  function openDB(){
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, DB_VER);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains('meal_catalog')){
+          const s = db.createObjectStore('meal_catalog', { keyPath: 'id' });
+          s.createIndex('name', 'name', { unique: true });
+          s.createIndex('updated_at', 'updated_at', { unique: false });
+          s.createIndex('pinned', 'pinned', { unique: false });
+        }
+        if (!db.objectStoreNames.contains('meals')){
+          const s = db.createObjectStore('meals', { keyPath: 'id' });
+          s.createIndex('date', 'date', { unique: false });
+          s.createIndex('timestamp', 'timestamp', { unique: false });
+          s.createIndex('catalog_id', 'catalog_id', { unique: false });
+        }
+        if (!db.objectStoreNames.contains('stools')){
+          const s = db.createObjectStore('stools', { keyPath: 'id' });
+          s.createIndex('date', 'date', { unique: false });
+          s.createIndex('timestamp', 'timestamp', { unique: false });
+        }
+        if (!db.objectStoreNames.contains('daily_status')){
+          const s = db.createObjectStore('daily_status', { keyPath: 'date' });
+          s.createIndex('updated_at', 'updated_at', { unique: false });
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  function tx(storeNames, mode='readonly'){
+    return db.transaction(storeNames, mode);
+  }
+
+  function put(store, value){
+    return new Promise((resolve, reject) => {
+      const req = store.put(value);
+      req.onsuccess = () => resolve(value);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  function del(store, key){
+    return new Promise((resolve, reject) => {
+      const req = store.delete(key);
+      req.onsuccess = () => resolve(true);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  function get(store, key){
+    return new Promise((resolve, reject) => {
+      const req = store.get(key);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  function getAll(store){
+    return new Promise((resolve, reject) => {
+      const req = store.getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  function getAllByIndex(store, indexName, key){
+    return new Promise((resolve, reject) => {
+      const idx = store.index(indexName);
+      const req = idx.getAll(key);
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  function clearStore(store){
+    return new Promise((resolve, reject) => {
+      const req = store.clear();
+      req.onsuccess = () => resolve(true);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async function upsertCatalogItemByName(name, { pinned=false } = {}){
+    const t = tx(['meal_catalog'], 'readwrite');
+    const store = t.objectStore('meal_catalog');
+    const idx = store.index('name');
+    const existing = await new Promise((resolve, reject) => {
+      const req = idx.get(name);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+
+    const item = existing ? {
+      ...existing,
+      updated_at: nowISO(),
+      pinned: pinned || existing.pinned || false,
+    } : {
+      id: `c_${uuid()}`,
+      name,
+      tags: [],
+      pinned,
+      created_at: nowISO(),
+      updated_at: nowISO(),
+    };
+
+    await put(store, item);
+    await new Promise((resolve, reject) => {
+      t.oncomplete = () => resolve(true);
+      t.onerror = () => reject(t.error);
+      t.onabort = () => reject(t.error);
+    });
+    return item;
+  }
+
+  async function listCatalog(){
+    const t = tx(['meal_catalog'], 'readonly');
+    const store = t.objectStore('meal_catalog');
+    const all = await getAll(store);
+    all.sort((a,b) => {
+      const ap = a.pinned ? 1 : 0;
+      const bp = b.pinned ? 1 : 0;
+      if (ap !== bp) return bp - ap;
+      return (b.updated_at || '').localeCompare(a.updated_at || '');
+    });
+    return all;
+  }
+
+  async function addMeal(date, { name, satiety, notes }){
+    const item = await upsertCatalogItemByName(name);
+    const d = new Date();
+    const entry = {
+      id: `m_${uuid()}`,
+      timestamp: nowISO(),
+      date,
+      time: toTimeStr(d),
+      meal_name: item.name,
+      catalog_id: item.id,
+      tags: item.tags || [],
+      satiety: satiety ? Number(satiety) : null,
+      notes: notes || '',
+    };
+
+    const t = tx(['meals'], 'readwrite');
+    await put(t.objectStore('meals'), entry);
+    await new Promise((resolve, reject) => {
+      t.oncomplete = () => resolve(true);
+      t.onerror = () => reject(t.error);
+      t.onabort = () => reject(t.error);
+    });
+
+    await upsertCatalogItemByName(item.name);
+    return entry;
+  }
+
+  async function updateMeal(id, patch){
+    const t = tx(['meals'], 'readwrite');
+    const store = t.objectStore('meals');
+    const existing = await get(store, id);
+    if (!existing) return;
+    const updated = { ...existing, ...patch };
+    await put(store, updated);
+    await new Promise((resolve, reject) => {
+      t.oncomplete = () => resolve(true);
+      t.onerror = () => reject(t.error);
+      t.onabort = () => reject(t.error);
+    });
+  }
+
+  async function listMealsByDate(date){
+    const t = tx(['meals'], 'readonly');
+    const store = t.objectStore('meals');
+    const items = await getAllByIndex(store, 'date', date);
+    items.sort((a,b) => (a.time || '').localeCompare(b.time || '') || (a.timestamp || '').localeCompare(b.timestamp || ''));
+    return items;
+  }
+
+  async function deleteMeal(id){
+    const t = tx(['meals'], 'readwrite');
+    await del(t.objectStore('meals'), id);
+    await new Promise((resolve, reject) => {
+      t.oncomplete = () => resolve(true);
+      t.onerror = () => reject(t.error);
+      t.onabort = () => reject(t.error);
+    });
+  }
+
+  async function addStool(date, { bristol, description, notes }){
+    const d = new Date();
+    const entry = {
+      id: `s_${uuid()}`,
+      timestamp: nowISO(),
+      date,
+      time: toTimeStr(d),
+      bristol: Number(bristol),
+      description: description.trim(),
+      notes: notes || '',
+    };
+    const t = tx(['stools'], 'readwrite');
+    await put(t.objectStore('stools'), entry);
+    await new Promise((resolve, reject) => {
+      t.oncomplete = () => resolve(true);
+      t.onerror = () => reject(t.error);
+      t.onabort = () => reject(t.error);
+    });
+    return entry;
+  }
+
+  async function listStoolsByDate(date){
+    const t = tx(['stools'], 'readonly');
+    const store = t.objectStore('stools');
+    const items = await getAllByIndex(store, 'date', date);
+    items.sort((a,b) => (a.time || '').localeCompare(b.time || '') || (a.timestamp || '').localeCompare(b.timestamp || ''));
+    return items;
+  }
+
+  async function deleteStool(id){
+    const t = tx(['stools'], 'readwrite');
+    await del(t.objectStore('stools'), id);
+    await new Promise((resolve, reject) => {
+      t.oncomplete = () => resolve(true);
+      t.onerror = () => reject(t.error);
+      t.onabort = () => reject(t.error);
+    });
+  }
+
+  async function getDailyStatus(date){
+    const t = tx(['daily_status'], 'readonly');
+    return await get(t.objectStore('daily_status'), date);
+  }
+
+  async function upsertDailyStatus(date, patch){
+    const existing = await getDailyStatus(date);
+    const doc = {
+      date,
+      energy_1_5: existing?.energy_1_5 ?? null,
+      mood_1_5: existing?.mood_1_5 ?? null,
+      stress_1_5: existing?.stress_1_5 ?? null,
+      discomfort_0_5: existing?.discomfort_0_5 ?? null,
+      cravings_1_5: existing?.cravings_1_5 ?? null,
+      notes: existing?.notes ?? '',
+      updated_at: nowISO(),
+      ...patch,
+    };
+    const t = tx(['daily_status'], 'readwrite');
+    await put(t.objectStore('daily_status'), doc);
+    await new Promise((resolve, reject) => {
+      t.oncomplete = () => resolve(true);
+      t.onerror = () => reject(t.error);
+      t.onabort = () => reject(t.error);
+    });
+    return doc;
+  }
+
+  async function exportCSVs(){
+    const t = tx(['meals','stools','daily_status'], 'readonly');
+    const meals = await getAll(t.objectStore('meals'));
+    const stools = await getAll(t.objectStore('stools'));
+    const daily = await getAll(t.objectStore('daily_status'));
+
+    meals.sort((a,b) => (a.date||'').localeCompare(b.date||'') || (a.time||'').localeCompare(b.time||''));
+    stools.sort((a,b) => (a.date||'').localeCompare(b.date||'') || (a.time||'').localeCompare(b.time||''));
+    daily.sort((a,b) => (a.date||'').localeCompare(b.date||''));
+
+    const mealsHeader = ['date','time','meal_name','catalog_id','tags','satiety_1_5','notes'];
+    const stoolsHeader = ['date','time','bristol','description','notes'];
+    const dailyHeader = ['date','energy_1_5','mood_1_5','stress_1_5','discomfort_0_5','cravings_1_5','notes'];
+
+    const mealsRows = meals.map(m => [
+      m.date, m.time, m.meal_name, m.catalog_id, (m.tags||[]).join('|'), m.satiety ?? '', m.notes || ''
+    ]);
+    const stoolsRows = stools.map(s => [
+      s.date, s.time, s.bristol, s.description, s.notes || ''
+    ]);
+    const dailyRows = daily.map(d => [
+      d.date, d.energy_1_5 ?? '', d.mood_1_5 ?? '', d.stress_1_5 ?? '', d.discomfort_0_5 ?? '', d.cravings_1_5 ?? '', d.notes || ''
+    ]);
+
+    const toCSV = (header, rows) => {
+      const lines = [];
+      lines.push(header.join(','));
+      for (const r of rows){
+        lines.push(r.map(csvEscape).join(','));
+      }
+      return lines.join('\n');
+    };
+
+    const today = toDateStr(new Date());
+    downloadText(`meals_${today}.csv`, toCSV(mealsHeader, mealsRows), 'text/csv');
+    downloadText(`stools_${today}.csv`, toCSV(stoolsHeader, stoolsRows), 'text/csv');
+    downloadText(`daily_status_${today}.csv`, toCSV(dailyHeader, dailyRows), 'text/csv');
+  }
+
+  async function clearAll(){
+    const t = tx(['meals','stools','daily_status','meal_catalog'], 'readwrite');
+    await Promise.all([
+      clearStore(t.objectStore('meals')),
+      clearStore(t.objectStore('stools')),
+      clearStore(t.objectStore('daily_status')),
+      clearStore(t.objectStore('meal_catalog')),
+    ]);
+    await new Promise((resolve, reject) => {
+      t.oncomplete = () => resolve(true);
+      t.onerror = () => reject(t.error);
+      t.onabort = () => reject(t.error);
+    });
+  }
+
+  const el = {
+    datePicker: $("datePicker"),
+
+    mealSearch: $("mealSearch"),
+    mealSatiety: $("mealSatiety"),
+    mealNotes: $("mealNotes"),
+    btnAddMeal: $("btnAddMeal"),
+    btnPinMeal: $("btnPinMeal"),
+    mealChips: $("mealChips"),
+    mealList: $("mealList"),
+    mealEmpty: $("mealEmpty"),
+    mealCatalogList: $("mealCatalogList"),
+
+    stEnergy: $("stEnergy"),
+    stMood: $("stMood"),
+    stStress: $("stStress"),
+    stDiscomfort: $("stDiscomfort"),
+    stCravings: $("stCravings"),
+    stNotes: $("stNotes"),
+
+    stoolBristol: $("stoolBristol"),
+    stoolDesc: $("stoolDesc"),
+    stoolNotes: $("stoolNotes"),
+    btnAddStool: $("btnAddStool"),
+    stoolList: $("stoolList"),
+    stoolEmpty: $("stoolEmpty"),
+
+    btnExport: $("btnExport"),
+    btnClear: $("btnClear"),
+  };
+
+  let currentDate = null;
+
+  async function refreshCatalogUI(){
+    const catalog = await listCatalog();
+    el.mealCatalogList.innerHTML = '';
+    for (const c of catalog){
+      const opt = document.createElement('option');
+      opt.value = c.name;
+      el.mealCatalogList.appendChild(opt);
+    }
+
+    el.mealChips.innerHTML = '';
+    const top = catalog.slice(0, 10);
+    if (top.length === 0){
+      el.mealChips.innerHTML = '<span class="small">Aún no hay plantillas.</span>';
+      return;
+    }
+    for (const c of top){
+      const b = document.createElement('button');
+      b.className = 'chip';
+      b.type = 'button';
+      b.textContent = c.pinned ? `★ ${c.name}` : c.name;
+      b.addEventListener('click', () => {
+        el.mealSearch.value = c.name;
+        el.mealSearch.focus();
+      });
+      el.mealChips.appendChild(b);
+    }
+  }
+
+  function renderMealItem(m){
+    const div = document.createElement('div');
+    div.className = 'item';
+
+    const sat = (m.satiety === null || m.satiety === undefined || m.satiety === '') ? '' : ` · Lleno: ${m.satiety}/5`;
+
+    div.innerHTML = `
+      <div class="top">
+        <div>
+          <div><span class="mono">${m.time}</span> — <strong>${htmlEscape(m.meal_name)}</strong>${sat}</div>
+          <div class="meta">${m.notes ? `<span class=\"pill\">Notas</span> ${htmlEscape(m.notes)}` : '<span class="small">Pulsa Editar</span>'}</div>
+        </div>
+        <div class="actions">
+          <button class="btn secondary" data-edit type="button">Editar</button>
+          <button class="btn danger" data-del type="button">Borrar</button>
+        </div>
+      </div>
+
+      <div class="editBox">
+        <div class="grid2">
+          <div>
+            <label>Comida</label>
+            <input data-name list="mealCatalogList" value="${htmlEscape(m.meal_name)}" />
+            <div class="small">Si cambias el nombre, se estandariza en el catálogo.</div>
+          </div>
+          <div>
+            <label>Fecha</label>
+            <input type="date" data-f value="${m.date}" />
+          </div>
+          <div>
+            <label>Hora</label>
+            <input type="time" data-t value="${m.time}" />
+          </div>
+          <div>
+            <label>Lleno (1–5)</label>
+            <input type="number" min="1" max="5" step="1" data-s value="${m.satiety ?? ''}" />
+          </div>
+          <div style="grid-column: 1 / -1;">
+            <label>Notas</label>
+            <input data-n value="${htmlEscape(m.notes || '')}" />
+          </div>
+        </div>
+        <div style="display:flex; gap:10px; margin-top:10px; justify-content:flex-end;">
+          <button class="btn secondary" data-cancel type="button">Cancelar</button>
+          <button class="btn" data-save type="button">Guardar cambios</button>
+        </div>
+      </div>
+    `;
+
+    const editBox = div.querySelector('.editBox');
+    const btnEdit = div.querySelector('[data-edit]');
+    const btnDel = div.querySelector('[data-del]');
+    const btnCancel = div.querySelector('[data-cancel]');
+    const btnSave = div.querySelector('[data-save]');
+
+    const toggleEdit = () => {
+      editBox.style.display = (editBox.style.display === 'none' || editBox.style.display === '') ? 'block' : 'none';
+    };
+
+    btnEdit.addEventListener('click', (e) => { e.stopPropagation(); toggleEdit(); });
+    btnCancel.addEventListener('click', (e) => { e.stopPropagation(); editBox.style.display = 'none'; });
+
+    btnSave.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const f = div.querySelector('[data-f]').value;
+      const t = div.querySelector('[data-t]').value;
+      const s = div.querySelector('[data-s]').value;
+      const n = div.querySelector('[data-n]').value;
+      const name = (div.querySelector('[data-name]').value || '').trim();
+
+      if (!isValidDateStr(f)) { toast('Fecha inválida'); return; }
+      if (!isValidTimeStr(t)) { toast('Hora inválida'); return; }
+      if (!name) { toast('La comida no puede estar vacía'); return; }
+
+      const cat = await upsertCatalogItemByName(name);
+      await updateMeal(m.id, {
+        date: f,
+        time: t,
+        meal_name: cat.name,
+        catalog_id: cat.id,
+        tags: cat.tags || [],
+        satiety: s ? Number(s) : null,
+        notes: (n || '').trim(),
+      });
+
+      editBox.style.display = 'none';
+      await loadDay(currentDate);
+      toast('Comida actualizada');
+    });
+
+    btnDel.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (!confirm('¿Borrar esta comida?')) return;
+      await deleteMeal(m.id);
+      await loadDay(currentDate);
+      toast('Comida borrada');
+    });
+
+    return div;
+  }
+
+  function renderStoolItem(s){
+    const div = document.createElement('div');
+    div.className = 'item';
+    div.innerHTML = `
+      <div class="top">
+        <div>
+          <div><span class="mono">${s.time}</span> — <strong>Bristol ${s.bristol}</strong> — ${htmlEscape(s.description)}</div>
+          <div class="meta">${s.notes ? `<span class="pill">Notas</span> ${htmlEscape(s.notes)}` : ''}</div>
+        </div>
+        <div class="actions">
+          <button class="btn danger" data-del type="button">Borrar</button>
+        </div>
+      </div>
+    `;
+
+    div.querySelector('[data-del]').addEventListener('click', async () => {
+      if (!confirm('¿Borrar este registro?')) return;
+      await deleteStool(s.id);
+      await loadDay(currentDate);
+      toast('Registro borrado');
+    });
+
+    return div;
+  }
+
+  function setStatusInputs(status){
+    el.stEnergy.value = status?.energy_1_5 ?? '';
+    el.stMood.value = status?.mood_1_5 ?? '';
+    el.stStress.value = status?.stress_1_5 ?? '';
+    el.stDiscomfort.value = status?.discomfort_0_5 ?? '';
+    el.stCravings.value = status?.cravings_1_5 ?? '';
+    el.stNotes.value = status?.notes ?? '';
+  }
+
+  function parseNumInRange(v, min, max){
+    if (v === '' || v === null || v === undefined) return null;
+    const n = Number(v);
+    if (!Number.isFinite(n)) return null;
+    if (n < min || n > max) return null;
+    return n;
+  }
+
+  let statusSaveTimer = null;
+  function scheduleStatusSave(){
+    clearTimeout(statusSaveTimer);
+    statusSaveTimer = setTimeout(async () => {
+      const patch = {
+        energy_1_5: parseNumInRange(el.stEnergy.value, 1, 5),
+        mood_1_5: parseNumInRange(el.stMood.value, 1, 5),
+        stress_1_5: parseNumInRange(el.stStress.value, 1, 5),
+        discomfort_0_5: parseNumInRange(el.stDiscomfort.value, 0, 5),
+        cravings_1_5: parseNumInRange(el.stCravings.value, 1, 5),
+        notes: (el.stNotes.value || '').trim(),
+      };
+      await upsertDailyStatus(currentDate, patch);
+      toast('Estado guardado');
+    }, 350);
+  }
+
+  async function loadDay(date){
+    currentDate = date;
+
+    const meals = await listMealsByDate(date);
+    el.mealList.innerHTML = '';
+    for (const m of meals) el.mealList.appendChild(renderMealItem(m));
+    el.mealEmpty.style.display = meals.length ? 'none' : 'block';
+
+    const stools = await listStoolsByDate(date);
+    el.stoolList.innerHTML = '';
+    for (const s of stools) el.stoolList.appendChild(renderStoolItem(s));
+    el.stoolEmpty.style.display = stools.length ? 'none' : 'block';
+
+    const status = await getDailyStatus(date);
+    setStatusInputs(status);
+
+    await refreshCatalogUI();
+  }
+
+  el.btnAddMeal.addEventListener('click', async () => {
+    const name = (el.mealSearch.value || '').trim();
+    if (!name){ toast('Escribe o selecciona una comida'); return; }
+
+    await addMeal(currentDate, {
+      name,
+      satiety: el.mealSatiety.value,
+      notes: (el.mealNotes.value || '').trim(),
+    });
+
+    el.mealSearch.value = '';
+    el.mealNotes.value = '';
+    el.mealSatiety.value = '';
+
+    await loadDay(currentDate);
+    toast('Comida añadida');
+  });
+
+  el.btnPinMeal.addEventListener('click', async () => {
+    const name = (el.mealSearch.value || '').trim();
+    if (!name){ toast('Escribe la comida que quieres guardar'); return; }
+    await upsertCatalogItemByName(name, { pinned:true });
+    await refreshCatalogUI();
+    toast('Plantilla guardada');
+  });
+
+  el.btnAddStool.addEventListener('click', async () => {
+    const b = el.stoolBristol.value;
+    const desc = (el.stoolDesc.value || '').trim();
+    if (!b){ toast('Selecciona Bristol (1–7)'); return; }
+    if (!desc){ toast('La descripción es obligatoria'); return; }
+
+    await addStool(currentDate, {
+      bristol: b,
+      description: desc,
+      notes: (el.stoolNotes.value || '').trim(),
+    });
+
+    el.stoolBristol.value = '';
+    el.stoolDesc.value = '';
+    el.stoolNotes.value = '';
+
+    await loadDay(currentDate);
+    toast('Registro añadido');
+  });
+
+  for (const input of [el.stEnergy, el.stMood, el.stStress, el.stDiscomfort, el.stCravings, el.stNotes]){
+    input.addEventListener('input', scheduleStatusSave);
+    input.addEventListener('change', scheduleStatusSave);
+  }
+
+  el.btnExport.addEventListener('click', async () => {
+    await exportCSVs();
+    toast('CSV descargados');
+  });
+
+  el.btnClear.addEventListener('click', async () => {
+    const ok = confirm('Esto borrará TODOS los datos guardados en este navegador. ¿Continuar?');
+    if (!ok) return;
+    await clearAll();
+    await loadDay(currentDate);
+    toast('Datos borrados');
+  });
+
+  el.datePicker.addEventListener('change', async () => {
+    const v = el.datePicker.value;
+    if (!v) return;
+    await loadDay(v);
+  });
+
+  el.mealSearch.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter'){
+      e.preventDefault();
+      el.btnAddMeal.click();
+    }
+  });
+
+  async function boot(){
+    db = await openDB();
+    const today = toDateStr(new Date());
+    el.datePicker.value = today;
+    await loadDay(today);
+    toast('Listo');
+  }
+
+  boot().catch(err => {
+    console.error(err);
+    alert('Error inicializando la app: ' + (err?.message || String(err)));
+  });
+})();
+</script></body>
+</html>
